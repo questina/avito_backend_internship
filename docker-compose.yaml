@@ -1,0 +1,34 @@
+version: "2"
+
+services:
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    environment:
+      - "DB_USER=root"
+      - "DB_PASSWORD=rootroot"
+      - "DB_HOST=db.dev"
+      - "DB_NAME=balances"
+    container_name: app.dev
+    working_dir: /
+    command: go run *.go
+    ports:
+      - "8000:8000" # http
+    links:
+      - db
+  db:
+    image: mysql/mysql-server:5.7
+    restart: always
+    container_name: db.dev
+    command: --init-file /docker-entrypoint-initdb.d/init.sql
+    environment:
+      - "MYSQL_ROOT_PASSWORD=${MYSQL_ROOT_PASSWORD}"
+      - "MYSQL_USER=${DB_USER}"
+      - "MYSQL_PASSWORD=${DB_PASSWORD}"
+      - "MYSQL_DATABASE=${DB_NAME}"
+      - "DB_USER=root"
+    ports:
+      - '3305:3306'
+    volumes:
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql:ro

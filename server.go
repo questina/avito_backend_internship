@@ -10,6 +10,8 @@ import (
 
 func main() {
 
+	LoadEnv()
+
 	fmt.Println("Server will start at http://localhost:8000/")
 
 	connectDatabse()

@@ -92,8 +92,8 @@ func takeMoney(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-	var order_exists = CheckOrderId(ordReserve.OrderId)
-	if !order_exists {
+	var orderExists = CheckOrderId(ordReserve.OrderId)
+	if !orderExists {
 		json.NewEncoder(rw).Encode(map[string]string{"Status": "Order does not exists"})
 		fmt.Println(err)
 		return

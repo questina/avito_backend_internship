@@ -3,7 +3,15 @@ package main
 import (
 	"database/sql"
 	"fmt"
+	"github.com/joho/godotenv"
 )
+
+func LoadEnv() {
+	err := godotenv.Load(".env")
+	if err != nil {
+		fmt.Println("unable to load .env file")
+	}
+}
 
 func getUserBalance(userId int) float32 {
 	var userBalance float32
@@ -20,25 +28,35 @@ func getUserBalance(userId int) float32 {
 func updateBalance(newBalance float32, userId int) bool {
 	var userBalance = getUserBalance(userId)
 	if userBalance == -1 {
-		return false
-	}
-	stmt, err := db.Prepare("UPDATE user_balances SET balance=? WHERE id=?")
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-	_, queryError := stmt.Exec(userBalance+newBalance, userId)
-	if queryError != nil {
-		fmt.Println(queryError)
-		return false
+		stmt, err := db.Prepare("INSERT into user_balances SET balance=?")
+		if err != nil {
+			fmt.Println(err)
+			return false
+		}
+		_, queryError := stmt.Exec(newBalance)
+		if queryError != nil {
+			fmt.Println(queryError)
+			return false
+		}
+	} else {
+		stmt, err := db.Prepare("UPDATE user_balances SET balance=? WHERE id=?")
+		if err != nil {
+			fmt.Println(err)
+			return false
+		}
+		_, queryError := stmt.Exec(userBalance+newBalance, userId)
+		if queryError != nil {
+			fmt.Println(queryError)
+			return false
+		}
 	}
 	return true
 }
 
 func CheckOrderId(orderId int) bool {
-	var order OrderReserve
-	if err := db.QueryRow("SELECT * from orders where order_id = ?",
-		orderId).Scan(&order); err != nil {
+	var servId int
+	if err := db.QueryRow("SELECT service_id from orders where order_id=?",
+		orderId).Scan(&servId); err != nil {
 		if err == sql.ErrNoRows {
 			return false
 		}
