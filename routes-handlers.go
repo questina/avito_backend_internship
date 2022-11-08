@@ -1,7 +1,6 @@
 package main
 
 import (
-	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -50,7 +49,26 @@ func reserveMoney(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-	// TODO check if order id already exists
+
+	var userBalance = getUserBalance(ordReserve.UserId)
+	if userBalance == -1 {
+		json.NewEncoder(rw).Encode(map[string]string{"Status": "Could not read user id from database, please try later"})
+		fmt.Println(err)
+		return
+	}
+
+	if userBalance < ordReserve.Cost {
+		json.NewEncoder(rw).Encode(map[string]string{"Status": "User does not have enough money"})
+		fmt.Println(err)
+		return
+	}
+
+	var order_exists = CheckOrderId(ordReserve.OrderId)
+	if order_exists {
+		json.NewEncoder(rw).Encode(map[string]string{"Status": "Order already exists"})
+		fmt.Println(err)
+		return
+	}
 	stmt, err := db.Prepare("INSERT into orders SET order_id=?,service_id=?,user_id=?,cost=?")
 	if err != nil {
 		json.NewEncoder(rw).Encode(map[string]string{"Status": "Could not write to database, please try later"})
@@ -67,7 +85,6 @@ func reserveMoney(rw http.ResponseWriter, r *http.Request) {
 }
 
 func takeMoney(rw http.ResponseWriter, r *http.Request) {
-	// TODO check if order exists in database
 	rw.Header().Set("Content-Type", "application/json")
 	var ordReserve OrderReserve
 	err := json.NewDecoder(r.Body).Decode(&ordReserve)
@@ -75,19 +92,18 @@ func takeMoney(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-	var userBalance int
-	if err := db.QueryRow("SELECT balance from user_balances where id = ?",
-		ordReserve.UserId).Scan(&userBalance); err != nil {
-		if err == sql.ErrNoRows {
-			json.NewEncoder(rw).Encode(map[string]string{"Status": "Could not write to database, please try later"})
-			fmt.Println(err)
-			return
-		}
-		json.NewEncoder(rw).Encode(map[string]string{"Status": "Could not write to database, please try later"})
+	var order_exists = CheckOrderId(ordReserve.OrderId)
+	if !order_exists {
+		json.NewEncoder(rw).Encode(map[string]string{"Status": "Order does not exists"})
 		fmt.Println(err)
 		return
 	}
-
+	var userBalance = getUserBalance(ordReserve.UserId)
+	if userBalance == -1 {
+		json.NewEncoder(rw).Encode(map[string]string{"Status": "Could not read user id from database, please try later"})
+		fmt.Println(err)
+		return
+	}
 	tx, err := db.Begin()
 	_, err = tx.Exec("DELETE FROM orders WHERE order_id=?", ordReserve.OrderId)
 	if err != nil {
@@ -121,41 +137,11 @@ func getBalance(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-	fmt.Println(user.Id)
-	var userBalance int
-	if err := db.QueryRow("SELECT balance from user_balances where id = ?",
-		user.Id).Scan(&userBalance); err != nil {
-		if err == sql.ErrNoRows {
-			json.NewEncoder(rw).Encode(map[string]string{"Status": "Could not read from database, please try later"})
-			fmt.Println(err)
-			return
-		}
-		json.NewEncoder(rw).Encode(map[string]string{"Status": "Could not read from database, please try later"})
+	user.Balance = getUserBalance(user.Id)
+	if user.Balance == -1 {
+		json.NewEncoder(rw).Encode(map[string]string{"Status": "Could not read user id from database, please try later"})
 		fmt.Println(err)
 		return
 	}
-	user.Balance = userBalance
 	json.NewEncoder(rw).Encode(user)
-}
-
-func updateBalance(newBalance int, userId int) bool {
-	var userBalance int
-	if err := db.QueryRow("SELECT balance from user_balances where id = ?",
-		userId).Scan(&userBalance); err != nil {
-		if err == sql.ErrNoRows {
-			return false
-		}
-		return false
-	}
-	stmt, err := db.Prepare("UPDATE user_balances SET balance=? WHERE id=?")
-	if err != nil {
-		fmt.Println(err)
-		return false
-	}
-	_, queryError := stmt.Exec(userBalance+newBalance, userId)
-	if queryError != nil {
-		fmt.Println(queryError)
-		return false
-	}
-	return true
 }

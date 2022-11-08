@@ -3,23 +3,17 @@ package main
 // User is Interface for user details.
 type User struct {
 	Id      int
-	Balance int
+	Balance float32
 }
 
 type UpgradeBalance struct {
 	Id     int
-	Amount int `json:"amount"`
+	Amount float32 `json:"amount"`
 }
 
 type OrderReserve struct {
 	UserId    int
 	OrderId   int
 	ServiceId int
-	Cost      int
-}
-
-// ErrorResponse is interface for sending error message with code.
-type ErrorResponse struct {
-	Code    int
-	Message string
+	Cost      float32
 }
