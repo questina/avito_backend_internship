@@ -71,6 +71,11 @@ func ReserveMoney(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	if ordReserve.Cost < 0 {
+		http.Error(rw, "Order cost cant be negative", http.StatusBadRequest)
+		return
+	}
+
 	var userBalance = GetUserBalance(ordReserve.UserId, false)
 	if userBalance == -1 {
 		http.Error(rw, "Could not read user id from database", http.StatusInternalServerError)
@@ -138,6 +143,10 @@ func TakeMoney(rw http.ResponseWriter, r *http.Request) {
 	err := json.NewDecoder(r.Body).Decode(&ordReserve)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+	if ordReserve.Cost < 0 {
+		http.Error(rw, "Order cost cant be negative", http.StatusBadRequest)
 		return
 	}
 	var orderExists = CheckOrderId(ordReserve.OrderId)
@@ -293,6 +302,14 @@ func GenReport(rw http.ResponseWriter, r *http.Request) {
 		data = append(data, service_income)
 	}
 	defer rows.Close()
+
+	if _, err := os.Stat("./reports"); os.IsNotExist(err) {
+		err = os.Mkdir("./reports", os.ModePerm)
+		if err != nil {
+			http.Error(rw, "Failed to create directory reports", http.StatusInternalServerError)
+			return
+		}
+	}
 
 	f, err := os.Create(fmt.Sprintf("./reports/report_%d_%d.csv", reportInfo.Month, reportInfo.Year))
 	if err != nil {
