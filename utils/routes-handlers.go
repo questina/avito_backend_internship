@@ -30,6 +30,10 @@ func AddMoney(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
+	if up.Amount < 0 {
+		http.Error(rw, "Amount must be positive", http.StatusBadRequest)
+		return
+	}
 	var id = UpdateBalance(up.Amount, up.Id)
 	if id == -1 {
 		http.Error(rw, "Could not write to database", http.StatusInternalServerError)
@@ -334,7 +338,6 @@ func BalanceInfo(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-	fmt.Println(userId.Id)
 	var (
 		limit  = "10"
 		offset = "0"
