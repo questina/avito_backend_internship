@@ -3,6 +3,7 @@ USE balances;
 CREATE TABLE IF NOT EXISTS user_balances(
                               id INT(12) unsigned NOT NULL AUTO_INCREMENT,
                               balance FLOAT(6) unsigned DEFAULT 0,
+                              reserved FLOAT(6) unsigned DEFAULT 0,
                               PRIMARY KEY(id)
 );
 

@@ -7,9 +7,7 @@ import (
 
 func addApproutes(route *mux.Router) {
 
-	// route.HandleFunc("/", renderHome)
-
-	route.HandleFunc("/users", getUsers).Methods("GET")
+	// route.HandleFunc("/users", getUsers).Methods("GET")
 
 	route.HandleFunc("/add_money", addMoney).Methods("POST")
 
@@ -19,5 +17,7 @@ func addApproutes(route *mux.Router) {
 
 	route.HandleFunc("/get_balance", getBalance).Methods("POST")
 
-	fmt.Println("Routes are Loded.")
+	route.HandleFunc("/free_money", freeMoney).Methods("POST")
+
+	fmt.Println("Routes are Loaded.")
 }

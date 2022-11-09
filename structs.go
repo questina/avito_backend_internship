@@ -1,6 +1,5 @@
 package main
 
-// User is Interface for user details.
 type User struct {
 	Id      int
 	Balance float32
@@ -16,4 +15,14 @@ type OrderReserve struct {
 	OrderId   int
 	ServiceId int
 	Cost      float32
+}
+
+type AddMoneyReturn struct {
+	Id      int
+	Balance float32
+	Status  string
+}
+
+type StatusMessage struct {
+	Status string
 }

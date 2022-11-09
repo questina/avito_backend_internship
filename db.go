@@ -10,7 +10,7 @@ import (
 var db *sql.DB
 var err error
 
-func connectDatabse() {
+func connectDatabase() {
 	USER := os.Getenv("DB_USER")
 	PASS := os.Getenv("DB_PASSWORD")
 	HOST := os.Getenv("DB_HOST")

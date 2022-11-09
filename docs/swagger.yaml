@@ -1,0 +1,172 @@
+basePath: /
+definitions:
+  main.AddMoneyReturn:
+    properties:
+      balance:
+        type: number
+      id:
+        type: integer
+      status:
+        type: string
+    type: object
+  main.StatusMessage:
+    properties:
+      status:
+        type: string
+    type: object
+  main.User:
+    properties:
+      balance:
+        type: number
+      id:
+        type: integer
+    type: object
+host: localhost:8000
+info:
+  contact:
+    email: kristinagurtov@yandex.ru
+    name: API Support
+  description: Swagger API for Golang Project Balance Management.
+  termsOfService: http://swagger.io/terms/
+  title: Balance Management Swagger API
+  version: "1.0"
+paths:
+  /add_money:
+    post:
+      consumes:
+      - application/json
+      description: Create new user id if user does not exists and add money to his
+        account
+      parameters:
+      - description: User ID
+        in: body
+        name: id
+        schema:
+          type: integer
+      - description: Amount of money
+        in: body
+        name: amount
+        required: true
+        schema:
+          type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.AddMoneyReturn'
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: Add money to user account
+  /get_balance:
+    post:
+      consumes:
+      - application/json
+      description: Get user balance from user account
+      parameters:
+      - description: User ID
+        in: body
+        name: id
+        required: true
+        schema:
+          type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.User'
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: Get user balance
+  /reserve_money:
+    post:
+      consumes:
+      - application/json
+      description: Get request from service and reserve money on user account
+      parameters:
+      - description: User ID
+        in: body
+        name: UserId
+        required: true
+        schema:
+          type: integer
+      - description: Order ID
+        in: body
+        name: OrderId
+        required: true
+        schema:
+          type: integer
+      - description: Service ID
+        in: body
+        name: ServiceId
+        required: true
+        schema:
+          type: integer
+      - description: Order cost
+        in: body
+        name: Cost
+        required: true
+        schema:
+          type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.StatusMessage'
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: Reserve money on user account
+  /take_money:
+    post:
+      consumes:
+      - application/json
+      description: Take reserved money from user account
+      parameters:
+      - description: User ID
+        in: body
+        name: UserId
+        required: true
+        schema:
+          type: integer
+      - description: Order ID
+        in: body
+        name: OrderId
+        required: true
+        schema:
+          type: integer
+      - description: Service ID
+        in: body
+        name: ServiceId
+        required: true
+        schema:
+          type: integer
+      - description: Order cost
+        in: body
+        name: Cost
+        required: true
+        schema:
+          type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.StatusMessage'
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: Take reserved money
+swagger: "2.0"
