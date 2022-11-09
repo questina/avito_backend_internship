@@ -1,10 +1,8 @@
 package main
 
 import (
-	"fmt"
-	"github.com/gorilla/mux"
 	_ "github.com/questina/avito_backend_internship/docs"
-	httpSwagger "github.com/swaggo/http-swagger"
+	"github.com/questina/avito_backend_internship/utils"
 	"log"
 	"net/http"
 )
@@ -21,17 +19,6 @@ import (
 // @BasePath /
 func main() {
 
-	LoadEnv()
-
-	fmt.Println("Server will start at http://localhost:8000/")
-
-	connectDatabase()
-
-	route := mux.NewRouter()
-
-	addApproutes(route)
-
-	route.HandleFunc("/swagger/*", httpSwagger.Handler())
-
+	route := utils.Start()
 	log.Fatal(http.ListenAndServe(":8000", route))
 }

@@ -1,15 +1,17 @@
-package main
+package utils
 
 import (
 	"encoding/csv"
 	"encoding/json"
 	"fmt"
+	"github.com/questina/avito_backend_internship/db"
+	"github.com/questina/avito_backend_internship/schemes"
 	"net/http"
 	"os"
 	"strconv"
 )
 
-// addMoney godoc
+// AddMoney godoc
 // @Summary     Add money to user account
 // @Description Create new user id if user does not exists and add money to his account
 // @Accept      json
@@ -20,30 +22,30 @@ import (
 // @Failure 400
 // @Failure 500
 // @Router      /add_money [post]
-func addMoney(rw http.ResponseWriter, r *http.Request) {
+func AddMoney(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
-	var up UpgradeBalance
+	var up schemes.UpgradeBalance
 	err := json.NewDecoder(r.Body).Decode(&up)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-	var id = updateBalance(up.Amount, up.Id)
+	var id = UpdateBalance(up.Amount, up.Id)
 	if id == -1 {
 		http.Error(rw, "Could not write to database", http.StatusInternalServerError)
 		return
 	}
-	var userBalance = getUserBalance(id, true)
+	var userBalance = GetUserBalance(id, true)
 	if userBalance == -1 {
 		http.Error(rw, "Could not read user id from database", http.StatusInternalServerError)
 		return
 	}
 	AddEvent("ADD", up.Amount, -1, -1, id)
-	var resp = AddMoneyReturn{Id: id, Balance: userBalance, Status: "OK"}
+	var resp = schemes.AddMoneyReturn{Id: id, Balance: userBalance, Status: "OK"}
 	json.NewEncoder(rw).Encode(resp)
 }
 
-// reserveMoney godoc
+// ReserveMoney godoc
 // @Summary     Reserve money on user account
 // @Description Get request from service and reserve money on user account
 // @Accept      json
@@ -56,16 +58,16 @@ func addMoney(rw http.ResponseWriter, r *http.Request) {
 // @Failure 400
 // @Failure 500
 // @Router      /reserve_money [post]
-func reserveMoney(rw http.ResponseWriter, r *http.Request) {
+func ReserveMoney(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
-	var ordReserve OrderReserve
+	var ordReserve schemes.OrderReserve
 	err := json.NewDecoder(r.Body).Decode(&ordReserve)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
 
-	var userBalance = getUserBalance(ordReserve.UserId, false)
+	var userBalance = GetUserBalance(ordReserve.UserId, false)
 	if userBalance == -1 {
 		http.Error(rw, "Could not read user id from database", http.StatusInternalServerError)
 		return
@@ -82,7 +84,7 @@ func reserveMoney(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx, err := db.Begin()
+	tx, err := db.Db.Begin()
 
 	stmt, err := tx.Prepare("INSERT into orders SET order_id=?,service_id=?,user_id=?,cost=?")
 	if err != nil {
@@ -113,7 +115,7 @@ func reserveMoney(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(map[string]string{"Status": "OK"})
 }
 
-// takeMoney godoc
+// TakeMoney godoc
 // @Summary     Take reserved money
 // @Description Take reserved money from user account
 // @Accept      json
@@ -126,9 +128,9 @@ func reserveMoney(rw http.ResponseWriter, r *http.Request) {
 // @Failure 400
 // @Failure 500
 // @Router      /take_money [post]
-func takeMoney(rw http.ResponseWriter, r *http.Request) {
+func TakeMoney(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
-	var ordReserve OrderReserve
+	var ordReserve schemes.OrderReserve
 	err := json.NewDecoder(r.Body).Decode(&ordReserve)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
@@ -139,12 +141,12 @@ func takeMoney(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "Order does not exists", http.StatusBadRequest)
 		return
 	}
-	var userBalance = getUserBalance(ordReserve.UserId, true)
+	var userBalance = GetUserBalance(ordReserve.UserId, true)
 	if userBalance == -1 {
 		http.Error(rw, "Could not read user id from database", http.StatusInternalServerError)
 		return
 	}
-	tx, err := db.Begin()
+	tx, err := db.Db.Begin()
 	_, err = tx.Exec("DELETE FROM orders WHERE order_id=?", ordReserve.OrderId)
 	if err != nil {
 		tx.Rollback()
@@ -174,7 +176,7 @@ func takeMoney(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(map[string]string{"Status": "OK"})
 }
 
-// getBalance godoc
+// GetBalance getBalance godoc
 // @Summary     Get user balance
 // @Description Get user balance from user account
 // @Accept      json
@@ -184,15 +186,15 @@ func takeMoney(rw http.ResponseWriter, r *http.Request) {
 // @Failure 400
 // @Failure 500
 // @Router      /get_balance [post]
-func getBalance(rw http.ResponseWriter, r *http.Request) {
+func GetBalance(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
-	var user User
+	var user schemes.User
 	err := json.NewDecoder(r.Body).Decode(&user)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-	user.Balance = getUserBalance(user.Id, false)
+	user.Balance = GetUserBalance(user.Id, false)
 	if user.Balance == -1 {
 		http.Error(rw, "Could not read user from database", http.StatusInternalServerError)
 		return
@@ -200,7 +202,7 @@ func getBalance(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(user)
 }
 
-// freeMoney godoc
+// FreeMoney freeMoney godoc
 // @Summary     Free reserved money
 // @Description Free reserved money from user account
 // @Accept      json
@@ -213,9 +215,9 @@ func getBalance(rw http.ResponseWriter, r *http.Request) {
 // @Failure 400
 // @Failure 500
 // @Router      /free_money [post]
-func freeMoney(rw http.ResponseWriter, r *http.Request) {
+func FreeMoney(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
-	var ordReserve OrderReserve
+	var ordReserve schemes.OrderReserve
 	err := json.NewDecoder(r.Body).Decode(&ordReserve)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
@@ -227,7 +229,7 @@ func freeMoney(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	tx, err := db.Begin()
+	tx, err := db.Db.Begin()
 	_, err = tx.Exec("DELETE FROM orders WHERE order_id=?", ordReserve.OrderId)
 	if err != nil {
 		tx.Rollback()
@@ -251,7 +253,7 @@ func freeMoney(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(map[string]string{"Status": "OK"})
 }
 
-// genReport godoc
+// GenReport genReport godoc
 // @Summary     Generate report
 // @Description Generate report on monthly income from services
 // @Accept      json
@@ -262,8 +264,8 @@ func freeMoney(rw http.ResponseWriter, r *http.Request) {
 // @Failure 400
 // @Failure 500
 // @Router      /generate_report [post]
-func genReport(rw http.ResponseWriter, r *http.Request) {
-	var reportInfo ReportInput
+func GenReport(rw http.ResponseWriter, r *http.Request) {
+	var reportInfo schemes.ReportInput
 	err := json.NewDecoder(r.Body).Decode(&reportInfo)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
@@ -272,10 +274,10 @@ func genReport(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(fmt.Sprintf("./reports/report_%d_%d.csv", reportInfo.Month, reportInfo.Year)))
 	rw.Header().Set("Content-Type", "application/octet-stream")
 	var (
-		service_income ReportData
-		data           []ReportData
+		service_income schemes.ReportData
+		data           []schemes.ReportData
 	)
-	rows, err := db.Query("SELECT service_id, SUM(amount) FROM moneyflow "+
+	rows, err := db.Db.Query("SELECT service_id, SUM(amount) FROM moneyflow "+
 		"WHERE event_type=\"TAKE\" AND YEAR(datetime)=? AND MONTH(datetime)=? GROUP BY service_id",
 		reportInfo.Year, reportInfo.Month)
 	if err != nil {
@@ -311,7 +313,7 @@ func genReport(rw http.ResponseWriter, r *http.Request) {
 	return
 }
 
-// balanceInfo godoc
+// BalanceInfo godoc
 // @Summary     Give balance info
 // @Description Give balance info on user expenses
 // @Accept      json
@@ -324,9 +326,9 @@ func genReport(rw http.ResponseWriter, r *http.Request) {
 // @Failure 400
 // @Failure 500
 // @Router      /balance_info [post]
-func balanceInfo(rw http.ResponseWriter, r *http.Request) {
+func BalanceInfo(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
-	var userId UserId
+	var userId schemes.UserId
 	err := json.NewDecoder(r.Body).Decode(&userId)
 	if err != nil {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
@@ -349,8 +351,8 @@ func balanceInfo(rw http.ResponseWriter, r *http.Request) {
 		sort = q["sort"][0]
 	}
 	var (
-		event  BalanceInfo
-		events []BalanceInfo
+		event  schemes.BalanceInfo
+		events []schemes.BalanceInfo
 	)
 	var query string
 	if sort == "asc" {
@@ -360,7 +362,7 @@ func balanceInfo(rw http.ResponseWriter, r *http.Request) {
 		query = "SELECT datetime, amount, event_type, service_id, order_id FROM moneyflow " +
 			"WHERE user_id=? ORDER BY datetime DESC LIMIT ? OFFSET ?"
 	}
-	rows, err := db.Query(query, userId.Id, limit, offset)
+	rows, err := db.Db.Query(query, userId.Id, limit, offset)
 	if err != nil {
 		fmt.Println(err)
 		http.Error(rw, "Could not get info from database", http.StatusInternalServerError)

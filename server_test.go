@@ -4,7 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
-	"github.com/gorilla/mux"
+	"github.com/questina/avito_backend_internship/db"
+	"github.com/questina/avito_backend_internship/schemes"
+	"github.com/questina/avito_backend_internship/utils"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -12,18 +14,8 @@ import (
 	"testing"
 )
 
-var route mux.Router
-
 func TestMain(m *testing.M) {
-	LoadEnv()
-
-	fmt.Println("Server will start at http://localhost:8000/")
-
-	connectDatabase()
-
-	route := mux.NewRouter()
-
-	addApproutes(route)
+	utils.Start()
 	code := m.Run()
 	os.Exit(code)
 }
@@ -33,19 +25,19 @@ func TestAddUser(t *testing.T) {
 	bodyReader := bytes.NewReader(jsonBody)
 	req, _ := http.NewRequest("POST", "/add_money", bodyReader)
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(addMoney)
+	handler := http.HandlerFunc(utils.AddMoney)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
 	if body := rr.Body.String(); !strings.Contains(body, "\"Status\":\"OK\"") {
 		t.Errorf("Returned status not OK. Got %s", body)
 	}
-	var user User
+	var user schemes.User
 	json.NewDecoder(rr.Body).Decode(&user)
 	jsonBody = []byte(fmt.Sprintf(`{"id": %d, "amount": 300}`, user.Id))
 	bodyReader = bytes.NewReader(jsonBody)
 	req, _ = http.NewRequest("POST", "/add_money", bodyReader)
 	rr = httptest.NewRecorder()
-	handler = http.HandlerFunc(addMoney)
+	handler = http.HandlerFunc(utils.AddMoney)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
 	body := rr.Body.String()
@@ -86,12 +78,12 @@ func TestReserveMoney(t *testing.T) {
 	bodyReader := bytes.NewReader(jsonBody)
 	req, _ := http.NewRequest("POST", "/add_money", bodyReader)
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(addMoney)
+	handler := http.HandlerFunc(utils.AddMoney)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
 	body := rr.Body.String()
 
-	var user User
+	var user schemes.User
 	json.NewDecoder(rr.Body).Decode(&user)
 	jsonBody = []byte(fmt.Sprintf(`{
 		"UserId": %d,
@@ -102,7 +94,7 @@ func TestReserveMoney(t *testing.T) {
 	bodyReader = bytes.NewReader(jsonBody)
 	req, _ = http.NewRequest("POST", "/reserve_money", bodyReader)
 	rr = httptest.NewRecorder()
-	handler = http.HandlerFunc(reserveMoney)
+	handler = http.HandlerFunc(utils.ReserveMoney)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
 	body = rr.Body.String()
@@ -125,11 +117,11 @@ func TestTakeMoney(t *testing.T) {
 	bodyReader := bytes.NewReader(jsonBody)
 	req, _ := http.NewRequest("POST", "/add_money", bodyReader)
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(addMoney)
+	handler := http.HandlerFunc(utils.AddMoney)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
 
-	var user User
+	var user schemes.User
 	json.NewDecoder(rr.Body).Decode(&user)
 	jsonBody = []byte(fmt.Sprintf(`{
 		"UserId": %d,
@@ -140,7 +132,7 @@ func TestTakeMoney(t *testing.T) {
 	bodyReader = bytes.NewReader(jsonBody)
 	req, _ = http.NewRequest("POST", "/reserve_money", bodyReader)
 	rr = httptest.NewRecorder()
-	handler = http.HandlerFunc(reserveMoney)
+	handler = http.HandlerFunc(utils.ReserveMoney)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
 
@@ -153,7 +145,7 @@ func TestTakeMoney(t *testing.T) {
 	bodyReader = bytes.NewReader(jsonBody)
 	req, _ = http.NewRequest("POST", "/take_money", bodyReader)
 	rr = httptest.NewRecorder()
-	handler = http.HandlerFunc(takeMoney)
+	handler = http.HandlerFunc(utils.TakeMoney)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
 	body := rr.Body.String()
@@ -176,17 +168,17 @@ func TestGetBalance(t *testing.T) {
 	bodyReader := bytes.NewReader(jsonBody)
 	req, _ := http.NewRequest("POST", "/add_money", bodyReader)
 	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(addMoney)
+	handler := http.HandlerFunc(utils.AddMoney)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
 
-	var user User
+	var user schemes.User
 	json.NewDecoder(rr.Body).Decode(&user)
 	jsonBody = []byte(fmt.Sprintf(`{"id": %d}`, user.Id))
 	bodyReader = bytes.NewReader(jsonBody)
 	req, _ = http.NewRequest("POST", "/get_balance", bodyReader)
 	rr = httptest.NewRecorder()
-	handler = http.HandlerFunc(getBalance)
+	handler = http.HandlerFunc(utils.GetBalance)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
 	body := rr.Body.String()
@@ -221,7 +213,7 @@ func checkResponseCode(t *testing.T, expected, actual int) {
 
 func clearTable(user_id int, order_id int) {
 	if order_id > 0 {
-		stmt, err := db.Prepare("DELETE FROM orders WHERE order_id=?")
+		stmt, err := db.Db.Prepare("DELETE FROM orders WHERE order_id=?")
 		if err != nil {
 			fmt.Println(err)
 		}
@@ -231,7 +223,7 @@ func clearTable(user_id int, order_id int) {
 		}
 	}
 	if user_id > 0 {
-		stmt, err := db.Prepare("DELETE FROM user_balances WHERE id=?")
+		stmt, err := db.Db.Prepare("DELETE FROM user_balances WHERE id=?")
 		if err != nil {
 			fmt.Println(err)
 		}

@@ -1,4 +1,4 @@
-package main
+package schemes
 
 type User struct {
 	Id      int
