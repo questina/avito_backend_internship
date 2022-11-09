@@ -26,3 +26,25 @@ type AddMoneyReturn struct {
 type StatusMessage struct {
 	Status string
 }
+
+type ReportInput struct {
+	Year  int
+	Month int
+}
+
+type ReportData struct {
+	Service_id int
+	Income     float32
+}
+
+type UserId struct {
+	Id int
+}
+
+type BalanceInfo struct {
+	Timestamp string
+	Amount    int
+	EventType string
+	ServiceId int
+	OrderId   int
+}

@@ -28,16 +28,6 @@ func TestMain(m *testing.M) {
 	os.Exit(code)
 }
 
-func TestGetUser(t *testing.T) {
-	req, _ := http.NewRequest("GET", "/users", nil)
-	rr := httptest.NewRecorder()
-	handler := http.HandlerFunc(getUsers)
-
-	handler.ServeHTTP(rr, req)
-
-	checkResponseCode(t, http.StatusOK, rr.Code)
-}
-
 func TestAddUser(t *testing.T) {
 	jsonBody := []byte(`{"amount": 100}`)
 	bodyReader := bytes.NewReader(jsonBody)
@@ -51,7 +41,6 @@ func TestAddUser(t *testing.T) {
 	}
 	var user User
 	json.NewDecoder(rr.Body).Decode(&user)
-	fmt.Println(user)
 	jsonBody = []byte(fmt.Sprintf(`{"id": %d, "amount": 300}`, user.Id))
 	bodyReader = bytes.NewReader(jsonBody)
 	req, _ = http.NewRequest("POST", "/add_money", bodyReader)
@@ -60,9 +49,34 @@ func TestAddUser(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
 	body := rr.Body.String()
-	if body != fmt.Sprintf("{\"Balance\": \"%f\", \"Id\": \"%d\", \"Status\": \"OK\"}", float32(400), user.Id) {
+	var mapBody map[string]interface{}
+	json.Unmarshal([]byte(body), &mapBody)
+	if money, ok := mapBody["Balance"]; ok {
+		if money != float64(400) {
+			clearTable(user.Id, 0)
+			t.Errorf("Incorrect balance added. Expected %f, got %f", float32(400), money)
+		}
+	} else {
 		clearTable(user.Id, 0)
-		t.Errorf("Returned status not OK. Got %s", body)
+		t.Errorf("Incorrect json output in add_money. No \"Balance\" field")
+	}
+	if id, ok := mapBody["Id"]; ok {
+		if id != float64(user.Id) {
+			clearTable(user.Id, 0)
+			t.Errorf("Incorrect user id returned. Expected %d, got %f", user.Id, id)
+		}
+	} else {
+		clearTable(user.Id, 0)
+		t.Errorf("Incorrect json output in add_money. No \"Id\" field")
+	}
+	if statusMsg, ok := mapBody["Status"]; ok {
+		if statusMsg != "OK" {
+			clearTable(user.Id, 0)
+			t.Errorf("Incorrect status returned. Expected %s, got %s", "OK", statusMsg)
+		}
+	} else {
+		clearTable(user.Id, 0)
+		t.Errorf("Incorrect json output in add_money. No \"Status\" field")
 	}
 	clearTable(user.Id, 0)
 }
@@ -76,12 +90,9 @@ func TestReserveMoney(t *testing.T) {
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
 	body := rr.Body.String()
-	if !strings.Contains(body, "'Status': 'OK'") {
-		t.Errorf("Returned status not OK. Got %s", body)
-	}
+
 	var user User
 	json.NewDecoder(rr.Body).Decode(&user)
-
 	jsonBody = []byte(fmt.Sprintf(`{
 		"UserId": %d,
 		"OrderId": 1,
@@ -94,10 +105,17 @@ func TestReserveMoney(t *testing.T) {
 	handler = http.HandlerFunc(reserveMoney)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
-	fmt.Println(rr.Body.String())
 	body = rr.Body.String()
-	if body != "{\"Status\":\"OK\"}" {
-		t.Errorf("Returned status not OK. Got %s", body)
+	var mapBody map[string]interface{}
+	json.Unmarshal([]byte(body), &mapBody)
+	if statusMsg, ok := mapBody["Status"]; ok {
+		if statusMsg != "OK" {
+			clearTable(user.Id, 1)
+			t.Errorf("Incorrect status returned. Expected %s, got %s", "OK", statusMsg)
+		}
+	} else {
+		clearTable(user.Id, 1)
+		t.Errorf("Incorrect json output in add_money. No \"Status\" field")
 	}
 	clearTable(user.Id, 1)
 }
@@ -110,13 +128,9 @@ func TestTakeMoney(t *testing.T) {
 	handler := http.HandlerFunc(addMoney)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
-	body := rr.Body.String()
-	if strings.Contains(body, "'Status': 'OK'") {
-		t.Errorf("Returned status not OK. Got %s", body)
-	}
+
 	var user User
 	json.NewDecoder(rr.Body).Decode(&user)
-
 	jsonBody = []byte(fmt.Sprintf(`{
 		"UserId": %d,
 		"OrderId": 1,
@@ -129,9 +143,6 @@ func TestTakeMoney(t *testing.T) {
 	handler = http.HandlerFunc(reserveMoney)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
-	if body := rr.Body.String(); strings.Contains(body, "'Status': 'OK'") {
-		t.Errorf("Returned status not OK. Got %s", body)
-	}
 
 	jsonBody = []byte(fmt.Sprintf(`{
 		"UserId": %d,
@@ -145,8 +156,17 @@ func TestTakeMoney(t *testing.T) {
 	handler = http.HandlerFunc(takeMoney)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
-	if body := rr.Body.String(); strings.Contains(body, "'Status': 'OK'") {
-		t.Errorf("Returned status not OK. Got %s", body)
+	body := rr.Body.String()
+	var mapBody map[string]interface{}
+	json.Unmarshal([]byte(body), &mapBody)
+	if statusMsg, ok := mapBody["Status"]; ok {
+		if statusMsg != "OK" {
+			clearTable(user.Id, 1)
+			t.Errorf("Incorrect status returned. Expected %s, got %s", "OK", statusMsg)
+		}
+	} else {
+		clearTable(user.Id, 1)
+		t.Errorf("Incorrect json output in add_money. No \"Status\" field")
 	}
 	clearTable(user.Id, 1)
 }
@@ -159,11 +179,9 @@ func TestGetBalance(t *testing.T) {
 	handler := http.HandlerFunc(addMoney)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
-	body := rr.Body.String()
-	if strings.Contains(body, "'Status': 'OK'") {
-		t.Errorf("Returned status not OK. Got %s", body)
-	}
+
 	var user User
+	json.NewDecoder(rr.Body).Decode(&user)
 	jsonBody = []byte(fmt.Sprintf(`{"id": %d}`, user.Id))
 	bodyReader = bytes.NewReader(jsonBody)
 	req, _ = http.NewRequest("POST", "/get_balance", bodyReader)
@@ -171,9 +189,26 @@ func TestGetBalance(t *testing.T) {
 	handler = http.HandlerFunc(getBalance)
 	handler.ServeHTTP(rr, req)
 	checkResponseCode(t, http.StatusOK, rr.Code)
-	body = rr.Body.String()
-	if body == fmt.Sprintf("{\"Id\": %d, \"Balance\": %f}", user.Id, user.Balance) {
-		t.Errorf("Returned status not OK. Got %s", body)
+	body := rr.Body.String()
+	var mapBody map[string]interface{}
+	json.Unmarshal([]byte(body), &mapBody)
+	if money, ok := mapBody["Balance"]; ok {
+		if money != float64(100) {
+			clearTable(user.Id, 0)
+			t.Errorf("Incorrect balance added. Expected %f, got %f", float32(100), money)
+		}
+	} else {
+		clearTable(user.Id, 0)
+		t.Errorf("Incorrect json output in add_money. No \"Balance\" field")
+	}
+	if id, ok := mapBody["Id"]; ok {
+		if id != float64(user.Id) {
+			clearTable(user.Id, 0)
+			t.Errorf("Incorrect user id returned. Expected %d, got %f", user.Id, id)
+		}
+	} else {
+		clearTable(user.Id, 0)
+		t.Errorf("Incorrect json output in add_money. No \"Id\" field")
 	}
 	clearTable(user.Id, 0)
 }
@@ -186,15 +221,21 @@ func checkResponseCode(t *testing.T, expected, actual int) {
 
 func clearTable(user_id int, order_id int) {
 	if order_id > 0 {
-		stmt, _ := db.Prepare("DELETE FROM orders WHERE order_id=?")
-		_, err := stmt.Exec(order_id)
+		stmt, err := db.Prepare("DELETE FROM orders WHERE order_id=?")
+		if err != nil {
+			fmt.Println(err)
+		}
+		_, err = stmt.Exec(order_id)
 		if err != nil {
 			fmt.Printf("Could not delete from orders with order_id=%d\n", order_id)
 		}
 	}
 	if user_id > 0 {
-		stmt, _ := db.Prepare("DELETE FROM user_balances WHERE user_id=?")
-		_, err := stmt.Exec(order_id)
+		stmt, err := db.Prepare("DELETE FROM user_balances WHERE id=?")
+		if err != nil {
+			fmt.Println(err)
+		}
+		_, err = stmt.Exec(order_id)
 		if err != nil {
 			fmt.Printf("Could not delete from user_balances with user_id=%d\n", user_id)
 		}

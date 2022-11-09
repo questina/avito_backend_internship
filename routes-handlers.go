@@ -1,8 +1,12 @@
 package main
 
 import (
+	"encoding/csv"
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"os"
+	"strconv"
 )
 
 // addMoney godoc
@@ -29,11 +33,12 @@ func addMoney(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "Could not write to database", http.StatusInternalServerError)
 		return
 	}
-	var userBalance = getUserBalance(id)
+	var userBalance = getUserBalance(id, true)
 	if userBalance == -1 {
 		http.Error(rw, "Could not read user id from database", http.StatusInternalServerError)
 		return
 	}
+	AddEvent("ADD", up.Amount, -1, -1, id)
 	var resp = AddMoneyReturn{Id: id, Balance: userBalance, Status: "OK"}
 	json.NewEncoder(rw).Encode(resp)
 }
@@ -60,7 +65,7 @@ func reserveMoney(rw http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	var userBalance = getUserBalance(ordReserve.UserId)
+	var userBalance = getUserBalance(ordReserve.UserId, false)
 	if userBalance == -1 {
 		http.Error(rw, "Could not read user id from database", http.StatusInternalServerError)
 		return
@@ -104,8 +109,8 @@ func reserveMoney(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "Could not commit changes", http.StatusInternalServerError)
 		return
 	}
-
-	json.NewEncoder(rw).Encode(map[string]string{"Status": "Ok"})
+	AddEvent("RESERVE", ordReserve.Cost, ordReserve.ServiceId, ordReserve.OrderId, ordReserve.UserId)
+	json.NewEncoder(rw).Encode(map[string]string{"Status": "OK"})
 }
 
 // takeMoney godoc
@@ -134,7 +139,7 @@ func takeMoney(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "Order does not exists", http.StatusBadRequest)
 		return
 	}
-	var userBalance = getUserBalance(ordReserve.UserId)
+	var userBalance = getUserBalance(ordReserve.UserId, true)
 	if userBalance == -1 {
 		http.Error(rw, "Could not read user id from database", http.StatusInternalServerError)
 		return
@@ -165,7 +170,8 @@ func takeMoney(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "Could not commit changes", http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(rw).Encode(map[string]string{"Status": "Ok"})
+	AddEvent("TAKE", ordReserve.Cost, ordReserve.ServiceId, ordReserve.OrderId, ordReserve.UserId)
+	json.NewEncoder(rw).Encode(map[string]string{"Status": "OK"})
 }
 
 // getBalance godoc
@@ -186,7 +192,7 @@ func getBalance(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, err.Error(), http.StatusBadRequest)
 		return
 	}
-	user.Balance = getUserBalance(user.Id)
+	user.Balance = getUserBalance(user.Id, false)
 	if user.Balance == -1 {
 		http.Error(rw, "Could not read user from database", http.StatusInternalServerError)
 		return
@@ -194,6 +200,19 @@ func getBalance(rw http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(rw).Encode(user)
 }
 
+// freeMoney godoc
+// @Summary     Free reserved money
+// @Description Free reserved money from user account
+// @Accept      json
+// @Produce     json
+// @Param       UserId     body     int   true "User ID"
+// @Param       OrderId     body int true  "Order ID"
+// @Param		ServiceId	body int true "Service ID"
+// @Param		Cost body number true "Order cost"
+// @Success     200    {object} StatusMessage
+// @Failure 400
+// @Failure 500
+// @Router      /free_money [post]
 func freeMoney(rw http.ResponseWriter, r *http.Request) {
 	rw.Header().Set("Content-Type", "application/json")
 	var ordReserve OrderReserve
@@ -207,11 +226,7 @@ func freeMoney(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "Order does not exists", http.StatusBadRequest)
 		return
 	}
-	var userBalance = getUserBalance(ordReserve.UserId)
-	if userBalance == -1 {
-		http.Error(rw, "Could not read user id from database", http.StatusInternalServerError)
-		return
-	}
+
 	tx, err := db.Begin()
 	_, err = tx.Exec("DELETE FROM orders WHERE order_id=?", ordReserve.OrderId)
 	if err != nil {
@@ -232,5 +247,129 @@ func freeMoney(rw http.ResponseWriter, r *http.Request) {
 		http.Error(rw, "Could not commit changes", http.StatusInternalServerError)
 		return
 	}
-	json.NewEncoder(rw).Encode(map[string]string{"Status": "Ok"})
+	AddEvent("FREE", ordReserve.Cost, ordReserve.ServiceId, ordReserve.OrderId, ordReserve.UserId)
+	json.NewEncoder(rw).Encode(map[string]string{"Status": "OK"})
+}
+
+// genReport godoc
+// @Summary     Generate report
+// @Description Generate report on monthly income from services
+// @Accept      json
+// @Produce     octet-stream
+// @Param       Year     body     int   true "Search Year"
+// @Param       Month     body int true  "Search Month"
+// @Success     200    {object} StatusMessage
+// @Failure 400
+// @Failure 500
+// @Router      /generate_report [post]
+func genReport(rw http.ResponseWriter, r *http.Request) {
+	var reportInfo ReportInput
+	err := json.NewDecoder(r.Body).Decode(&reportInfo)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+	rw.Header().Set("Content-Disposition", "attachment; filename="+strconv.Quote(fmt.Sprintf("./reports/report_%d_%d.csv", reportInfo.Month, reportInfo.Year)))
+	rw.Header().Set("Content-Type", "application/octet-stream")
+	var (
+		service_income ReportData
+		data           []ReportData
+	)
+	rows, err := db.Query("SELECT service_id, SUM(amount) FROM moneyflow "+
+		"WHERE event_type=\"TAKE\" AND YEAR(datetime)=? AND MONTH(datetime)=? GROUP BY service_id",
+		reportInfo.Year, reportInfo.Month)
+	if err != nil {
+		http.Error(rw, "Could not get info from database", http.StatusInternalServerError)
+		return
+	}
+	for rows.Next() {
+		rows.Scan(&service_income.Service_id, &service_income.Income)
+		data = append(data, service_income)
+	}
+	defer rows.Close()
+
+	f, err := os.Create(fmt.Sprintf("./reports/report_%d_%d.csv", reportInfo.Month, reportInfo.Year))
+	if err != nil {
+		http.Error(rw, "Failed to open file", http.StatusInternalServerError)
+		return
+	}
+	w := csv.NewWriter(f)
+	for _, service_line := range data {
+		row := []string{strconv.Itoa(service_line.Service_id), strconv.FormatFloat(float64(service_line.Income), 'f', -1, 32)}
+		if err := w.Write(row); err != nil {
+			http.Error(rw, "Failed to write into file", http.StatusInternalServerError)
+			return
+		}
+	}
+	w.Flush()
+	err = f.Close()
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+	http.ServeFile(rw, r, fmt.Sprintf("./reports/report_%d_%d.csv", reportInfo.Month, reportInfo.Year))
+	return
+}
+
+// balanceInfo godoc
+// @Summary     Give balance info
+// @Description Give balance info on user expenses
+// @Accept      json
+// @Produce     json
+// @Param       UserId     body     int   true "User ID"
+// @Param   sort  query     string     false  "Direction of Sorting"       Enums(asc, desc)
+// @Param   limit  query     int     false  "Search Limit"
+// @Param   offset  query     int    false  "Search offset"
+// @Success     200    {object} StatusMessage
+// @Failure 400
+// @Failure 500
+// @Router      /balance_info [post]
+func balanceInfo(rw http.ResponseWriter, r *http.Request) {
+	rw.Header().Set("Content-Type", "application/json")
+	var userId UserId
+	err := json.NewDecoder(r.Body).Decode(&userId)
+	if err != nil {
+		http.Error(rw, err.Error(), http.StatusBadRequest)
+		return
+	}
+	fmt.Println(userId.Id)
+	var (
+		limit  = "10"
+		offset = "0"
+		sort   = "asc"
+	)
+	q := r.URL.Query()
+	if len(q["limit"]) != 0 {
+		limit = q["limit"][0]
+	}
+	if len(q["offset"]) != 0 {
+		offset = q["offset"][0]
+	}
+	if len(q["sort"]) != 0 {
+		sort = q["sort"][0]
+	}
+	var (
+		event  BalanceInfo
+		events []BalanceInfo
+	)
+	var query string
+	if sort == "asc" {
+		query = "SELECT datetime, amount, event_type, service_id, order_id FROM moneyflow " +
+			"WHERE user_id=? ORDER BY datetime ASC LIMIT ? OFFSET ?"
+	} else {
+		query = "SELECT datetime, amount, event_type, service_id, order_id FROM moneyflow " +
+			"WHERE user_id=? ORDER BY datetime DESC LIMIT ? OFFSET ?"
+	}
+	rows, err := db.Query(query, userId.Id, limit, offset)
+	if err != nil {
+		fmt.Println(err)
+		http.Error(rw, "Could not get info from database", http.StatusInternalServerError)
+		return
+	}
+	for rows.Next() {
+		rows.Scan(&event.Timestamp, &event.Amount, &event.EventType, &event.ServiceId, &event.OrderId)
+		events = append(events, event)
+	}
+	defer rows.Close()
+	json.NewEncoder(rw).Encode(events)
 }

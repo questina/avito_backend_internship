@@ -13,20 +13,31 @@ func LoadEnv() {
 	}
 }
 
-func getUserBalance(userId int) float32 {
+func getUserBalance(userId int, without_reserve bool) float32 {
 	var userBalance float32
-	if err := db.QueryRow("SELECT balance - reserved from user_balances where id = ?",
-		userId).Scan(&userBalance); err != nil {
-		if err == sql.ErrNoRows {
+	if without_reserve {
+		if err := db.QueryRow("SELECT balance from user_balances where id = ?",
+			userId).Scan(&userBalance); err != nil {
+			if err == sql.ErrNoRows {
+				return -1
+			}
 			return -1
 		}
-		return -1
+		return userBalance
+	} else {
+		if err := db.QueryRow("SELECT balance - reserved from user_balances where id = ?",
+			userId).Scan(&userBalance); err != nil {
+			if err == sql.ErrNoRows {
+				return -1
+			}
+			return -1
+		}
+		return userBalance
 	}
-	return userBalance
 }
 
 func updateBalance(newBalance float32, userId int) int {
-	var userBalance = getUserBalance(userId)
+	var userBalance = getUserBalance(userId, true)
 	if userBalance == -1 {
 		stmt, err := db.Prepare("INSERT into user_balances SET balance=?")
 		if err != nil {
@@ -91,6 +102,33 @@ func UpdateReservedBalance(serviceCost float32, userId int, tx *sql.Tx) bool {
 	if queryError != nil {
 		fmt.Println(queryError)
 		return false
+	}
+	return true
+}
+
+func AddEvent(eventType string, amount float32, serviceId int, orderId int, userId int) bool {
+	if serviceId == -1 && orderId == -1 {
+		stmt, err := db.Prepare("INSERT into moneyflow SET event_type=?,amount=?,user_id=?")
+		if err != nil {
+			fmt.Println(err)
+			return false
+		}
+		_, queryError := stmt.Exec(eventType, amount, userId)
+		if queryError != nil {
+			fmt.Println(queryError)
+			return false
+		}
+	} else {
+		stmt, err := db.Prepare("INSERT into moneyflow SET event_type=?,amount=?,service_id=?,order_id=?,user_id=?")
+		if err != nil {
+			fmt.Println(err)
+			return false
+		}
+		_, queryError := stmt.Exec(eventType, amount, serviceId, orderId, userId)
+		if queryError != nil {
+			fmt.Println(queryError)
+			return false
+		}
 	}
 	return true
 }

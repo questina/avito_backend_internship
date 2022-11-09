@@ -61,6 +61,120 @@ paths:
         "500":
           description: Internal Server Error
       summary: Add money to user account
+  /balance_info:
+    post:
+      consumes:
+      - application/json
+      description: Give balance info on user expenses
+      parameters:
+      - description: User ID
+        in: body
+        name: UserId
+        required: true
+        schema:
+          type: integer
+      - description: Direction of Sorting
+        enum:
+        - asc
+        - desc
+        in: query
+        name: sort
+        required: true
+        type: string
+      - description: Search Limit
+        in: query
+        name: limit
+        required: true
+        type: integer
+      - description: Search offset
+        in: query
+        name: offset
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.StatusMessage'
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: Give balance info
+  /free_money:
+    post:
+      consumes:
+      - application/json
+      description: Free reserved money from user account
+      parameters:
+      - description: User ID
+        in: body
+        name: UserId
+        required: true
+        schema:
+          type: integer
+      - description: Order ID
+        in: body
+        name: OrderId
+        required: true
+        schema:
+          type: integer
+      - description: Service ID
+        in: body
+        name: ServiceId
+        required: true
+        schema:
+          type: integer
+      - description: Order cost
+        in: body
+        name: Cost
+        required: true
+        schema:
+          type: number
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.StatusMessage'
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: Free reserved money
+  /generate_report:
+    post:
+      consumes:
+      - application/json
+      description: Generate report on monthly income from services
+      parameters:
+      - description: Search Year
+        in: body
+        name: Year
+        required: true
+        schema:
+          type: integer
+      - description: Search Month
+        in: body
+        name: Month
+        required: true
+        schema:
+          type: integer
+      produces:
+      - application/octet-stream
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/main.StatusMessage'
+        "400":
+          description: Bad Request
+        "500":
+          description: Internal Server Error
+      summary: Generate report
   /get_balance:
     post:
       consumes:

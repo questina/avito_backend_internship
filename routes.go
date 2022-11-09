@@ -19,5 +19,9 @@ func addApproutes(route *mux.Router) {
 
 	route.HandleFunc("/free_money", freeMoney).Methods("POST")
 
+	route.HandleFunc("/generate_report", genReport).Methods("POST")
+
+	route.HandleFunc("/balance_info", balanceInfo).Methods("POST")
+
 	fmt.Println("Routes are Loaded.")
 }
